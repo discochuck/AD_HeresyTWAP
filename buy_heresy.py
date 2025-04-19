@@ -10,8 +10,9 @@ PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
 HERESY_ADDRESS = Web3.to_checksum_address(
     os.getenv("HERESY_ADDRESS", "0x432d38F83a50EC77C409D086e97448794cf76dCF")
 )
+# Legacy V2 Router (UniswapV2‐style)
 ROUTER_ADDRESS = Web3.to_checksum_address(
-    os.getenv("PHARAOH_ROUTER", "0x062c62cA66E50Cfe277A95564Fe5bB504db1Fab8")
+    os.getenv("PHARAOH_ROUTER", "0xAAA45c8F5ef92a000a121d102F4e89278a711Faa")
 )
 WAVAX_ADDRESS  = Web3.to_checksum_address(
     os.getenv("WAVAX_ADDRESS",  "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7")
@@ -32,78 +33,67 @@ WAVAX_ABI = [
      "stateMutability":"nonpayable", "type":"function"}
 ]
 
-ROUTER_ABI = [
+V2_ROUTER_ABI = [
     {
-      "inputs":[
-        {
-          "components":[
-            {"internalType":"address","name":"tokenIn","type":"address"},
-            {"internalType":"address","name":"tokenOut","type":"address"},
-            {"internalType":"uint24","name":"fee","type":"uint24"},
-            {"internalType":"address","name":"recipient","type":"address"},
-            {"internalType":"uint256","name":"deadline","type":"uint256"},
-            {"internalType":"uint256","name":"amountIn","type":"uint256"},
-            {"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},
-            {"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}
-          ],
-          "internalType":"struct ISwapRouter.ExactInputSingleParams",
-          "name":"params","type":"tuple"
-        }
+      "name": "swapExactTokensForTokens",
+      "type": "function",
+      "stateMutability": "nonpayable",
+      "inputs": [
+        {"name":"amountIn","type":"uint256"},
+        {"name":"amountOutMin","type":"uint256"},
+        {"name":"path","type":"address[]"},
+        {"name":"to","type":"address"},
+        {"name":"deadline","type":"uint256"}
       ],
-      "name":"exactInputSingle",
-      "outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],
-      "stateMutability":"nonpayable","type":"function"
+      "outputs":[{"name":"amounts","type":"uint256[]"}]
     }
 ]
 
 wavax  = w3.eth.contract(address=WAVAX_ADDRESS,  abi=WAVAX_ABI)
-router = w3.eth.contract(address=ROUTER_ADDRESS, abi=ROUTER_ABI)
+router = w3.eth.contract(address=ROUTER_ADDRESS, abi=V2_ROUTER_ABI)
 
 def buy_heresy():
-    # 1) wrap AVAX → WAVAX
     amount = w3.to_wei(0.25, "ether")
+    deadline = w3.eth.get_block("latest")["timestamp"] + 300
+
+    # 1) Wrap AVAX → WAVAX
     tx1 = wavax.functions.deposit().build_transaction({
         "from": acct.address,
         "value": amount,
-        "gas": 100000,
+        "gas": 100_000,
         "nonce": w3.eth.get_transaction_count(acct.address)
     })
     signed1 = acct.sign_transaction(tx1)
     w3.eth.send_raw_transaction(signed1.raw_transaction)
     w3.eth.wait_for_transaction_receipt(signed1.hash)
-    print("Wrapped 0.25 AVAX → WAVAX")
+    print("✅ Wrapped 0.25 AVAX → WAVAX")
 
-    # 2) approve router
+    # 2) Approve router to spend WAVAX
     tx2 = wavax.functions.approve(ROUTER_ADDRESS, amount).build_transaction({
         "from": acct.address,
-        "gas": 100000,
+        "gas": 100_000,
         "nonce": w3.eth.get_transaction_count(acct.address)
     })
     signed2 = acct.sign_transaction(tx2)
     w3.eth.send_raw_transaction(signed2.raw_transaction)
     w3.eth.wait_for_transaction_receipt(signed2.hash)
-    print("Approved router for 0.25 WAVAX")
+    print("✅ Approved router for 0.25 WAVAX")
 
-    # 3) swap WAVAX → HERESY
-    deadline = w3.eth.get_block("latest")["timestamp"] + 300
-    params   = {
-        "tokenIn": WAVAX_ADDRESS,
-        "tokenOut": HERESY_ADDRESS,
-        "fee": 10000,
-        "recipient": acct.address,
-        "deadline": deadline,
-        "amountIn": amount,
-        "amountOutMinimum": 0,
-        "sqrtPriceLimitX96": 0
-    }
-    tx3 = router.functions.exactInputSingle(params).build_transaction({
+    # 3) Swap WAVAX → HERESY via V2
+    tx3 = router.functions.swapExactTokensForTokens(
+        amount,                   # amountIn = 0.25 WAVAX
+        0,                        # amountOutMin = accept any HERESY
+        [WAVAX_ADDRESS, HERESY_ADDRESS],
+        acct.address,
+        deadline
+    ).build_transaction({
         "from": acct.address,
-        "gas": 500000,
+        "gas": 300_000,
         "nonce": w3.eth.get_transaction_count(acct.address)
     })
     signed3  = acct.sign_transaction(tx3)
     tx_hash3 = w3.eth.send_raw_transaction(signed3.raw_transaction)
-    print("Swap TX → https://snowtrace.io/tx/" + tx_hash3.hex())
+    print("🔄 Swap TX → https://snowtrace.io/tx/" + tx_hash3.hex())
 
 if __name__ == "__main__":
     buy_heresy()
