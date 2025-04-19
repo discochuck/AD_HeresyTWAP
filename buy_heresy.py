@@ -19,7 +19,6 @@ WAVAX_ADDRESS  = Web3.to_checksum_address(
 
 # ── SETUP ─────────────────────────────────────────────────────────────────────
 w3   = Web3(Web3.HTTPProvider(RPC_URL))
-w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 acct = w3.eth.account.from_key(PRIVATE_KEY)
 
 # ── ABIs ──────────────────────────────────────────────────────────────────────
