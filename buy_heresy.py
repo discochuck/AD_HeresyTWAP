@@ -2,22 +2,27 @@ import os
 from web3 import Web3
 from dotenv import load_dotenv
 
+# ── LOAD ENV ──────────────────────────────────────────────────────────────────
 load_dotenv()
-
-# ── CONFIG ────────────────────────────────────────────────────────────────────
 RPC_URL        = os.getenv("AVAX_RPC_URL")
 PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
-HERESY         = Web3.to_checksum_address(os.getenv("HERESY_ADDRESS"))
-WAVAX          = Web3.to_checksum_address(os.getenv("WAVAX_ADDRESS"))
-ROUTER_ADDRESS = Web3.to_checksum_address(os.getenv("PHARAOH_ROUTER"))
+HERESY_ADDRESS = Web3.to_checksum_address(
+    os.getenv("HERESY_ADDRESS", "0x432d38F83a50EC77C409D086e97448794cf76dCF")
+)
+SWAP_ROUTER    = Web3.to_checksum_address(
+    os.getenv("PHARAOH_ROUTER", "0x062c62cA66E50Cfe277A95564Fe5bB504db1Fab8")
+)
+WAVAX_ADDRESS  = Web3.to_checksum_address(
+    os.getenv("WAVAX_ADDRESS",   "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7")
+)
 
-# ── WEB3 SETUP ─────────────────────────────────────────────────────────────────
+# ── WEB3 & ACCOUNT ────────────────────────────────────────────────────────────
 w3   = Web3(Web3.HTTPProvider(RPC_URL))
 acct = w3.eth.account.from_key(PRIVATE_KEY)
 
-# ── ABI FOR native‐AVAX UniswapV2‑style swap ────────────────────────────────────
+# ── ABI FOR swapExactAVAXForTokens ─────────────────────────────────────────────
 SWAP_NATIVE_ABI = [{
-    "inputs":[
+    "inputs": [
       {"name":"amountOutMin","type":"uint256"},
       {"name":"path","type":"address[]"},
       {"name":"to","type":"address"},
@@ -28,44 +33,31 @@ SWAP_NATIVE_ABI = [{
     "stateMutability":"payable",
     "type":"function"
 }]
-router = w3.eth.contract(address=ROUTER_ADDRESS, abi=SWAP_NATIVE_ABI)
+router = w3.eth.contract(address=SWAP_ROUTER, abi=SWAP_NATIVE_ABI)
 
 def buy_heresy():
+    # 0.25 AVAX
     amount   = w3.to_wei(0.25, "ether")
+    # give it 5 minutes to execute
     deadline = w3.eth.get_block("latest")["timestamp"] + 300
-    path     = [WAVAX, HERESY]
+    path     = [WAVAX_ADDRESS, HERESY_ADDRESS]
 
-    # --- DEBUG INFO -------------------------------------------------------------
-    print("Using router address:", ROUTER_ADDRESS)
-    code = w3.eth.get_code(ROUTER_ADDRESS)
-    print("Router code size:", len(code), "bytes")
-    print("Your AVAX balance:", w3.from_wei(w3.eth.get_balance(acct.address), "ether"))
-    print("Swap path:", path, "→ amountIn:", amount, "Wei")
-
-    # 1) static‐call to catch on‑chain reverts early
-    try:
-        router.functions.swapExactAVAXForTokens(
-            0, path, acct.address, deadline
-        ).call({
-            "from": acct.address,
-            "value": amount
-        })
-        print("✅ Static call succeeded (no revert in view)")
-    except Exception as e:
-        print("❌ Static call revert:", e)
-
-    # 2) build & send the real tx
+    # build the transaction
     tx = router.functions.swapExactAVAXForTokens(
-        0, path, acct.address, deadline
+        0,        # accept any amount of $HERESY
+        path,
+        acct.address,
+        deadline
     ).build_transaction({
         "from":  acct.address,
         "value": amount,
         "gas":   350_000,
         "nonce": w3.eth.get_transaction_count(acct.address, "pending")
     })
+
     signed  = acct.sign_transaction(tx)
     tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
     print("🔄 Swap TX → https://snowtrace.io/tx/" + tx_hash.hex())
 
-if __name__=="__main__":
+if __name__ == "__main__":
     buy_heresy()
