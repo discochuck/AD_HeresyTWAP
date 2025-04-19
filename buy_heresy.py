@@ -7,14 +7,14 @@ load_dotenv()  # locally loads .env; Heroku uses config vars
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 RPC_URL        = os.getenv("AVAX_RPC_URL")
 PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
-HERESY_ADDRESS = Web3.toChecksumAddress(
+HERESY_ADDRESS = Web3.to_checksum_address(
     os.getenv("HERESY_ADDRESS", "0x432d38F83a50EC77C409D086e97448794cf76dCF")
 )
-ROUTER_ADDRESS = Web3.toChecksumAddress(
+ROUTER_ADDRESS = Web3.to_checksum_address(
     os.getenv("PHARAOH_ROUTER", "0x062c62cA66E50Cfe277A95564Fe5bB504db1Fab8")
 )
-WAVAX_ADDRESS  = Web3.toChecksumAddress(
-    os.getenv("WAVAX_ADDRESS", "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7")
+WAVAX_ADDRESS = Web3.to_checksum_address(
+    os.getenv("WAVAX_ADDRESS",  "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7")
 )
 # ── SETUP ─────────────────────────────────────────────────────────────────────
 w3   = Web3(Web3.HTTPProvider(RPC_URL))
