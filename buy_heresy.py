@@ -7,6 +7,7 @@ load_dotenv()
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 RPC_URL     = os.getenv("AVAX_RPC_URL")
 PRIVATE_KEY = os.getenv("BOT_PRIVATE_KEY")
+# Your wrapper contract that worked in manual tests
 WRAPPER     = Web3.to_checksum_address("0x22C81c051a134c81Ce370D82Fa26975aE9D100B4")
 
 # ── WEB3 SETUP ─────────────────────────────────────────────────────────────────
@@ -22,7 +23,7 @@ def buy_heresy():
         "to":        WRAPPER,
         "from":      acct.address,
         "value":     amount,
-        "gas":       300_000,
+        "gas":       600_000,      # ↑ increased gas limit
         "gasPrice":  gas_price,
         "nonce":     nonce,
         "chainId":   43114
