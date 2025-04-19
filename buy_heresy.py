@@ -10,7 +10,6 @@ PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
 HERESY_ADDRESS = Web3.to_checksum_address(
     os.getenv("HERESY_ADDRESS", "0x432d38F83a50EC77C409D086e97448794cf76dCF")
 )
-# Legacy V2 Router (UniswapV2‐style)
 ROUTER_ADDRESS = Web3.to_checksum_address(
     os.getenv("PHARAOH_ROUTER", "0xAAA45c8F5ef92a000a121d102F4e89278a711Faa")
 )
@@ -24,21 +23,21 @@ acct = w3.eth.account.from_key(PRIVATE_KEY)
 
 # ── ABIs ──────────────────────────────────────────────────────────────────────
 WAVAX_ABI = [
-    {"inputs": [], "name": "deposit", "outputs": [], "stateMutability": "payable", "type": "function"},
+    {"inputs": [], "name": "deposit",     "outputs": [], "stateMutability": "payable",   "type": "function"},
     {"inputs": [{"internalType":"uint256","name":"wad","type":"uint256"}],
-     "name": "withdraw", "outputs": [], "stateMutability": "nonpayable", "type":"function"},
+     "name": "withdraw",    "outputs": [], "stateMutability": "nonpayable", "type":"function"},
     {"inputs":[{"internalType":"address","name":"guy","type":"address"},
                {"internalType":"uint256","name":"wad","type":"uint256"}],
-     "name": "approve", "outputs":[{"internalType":"bool","name":"","type":"bool"}],
-     "stateMutability":"nonpayable", "type":"function"}
+     "name": "approve",     "outputs":[{"internalType":"bool","name":"","type":"bool"}],
+     "stateMutability":"nonpayable","type":"function"}
 ]
 
 V2_ROUTER_ABI = [
     {
-      "name": "swapExactTokensForTokens",
-      "type": "function",
-      "stateMutability": "nonpayable",
-      "inputs": [
+      "name":"swapExactTokensForTokens",
+      "type":"function",
+      "stateMutability":"nonpayable",
+      "inputs":[
         {"name":"amountIn","type":"uint256"},
         {"name":"amountOutMin","type":"uint256"},
         {"name":"path","type":"address[]"},
@@ -53,15 +52,15 @@ wavax  = w3.eth.contract(address=WAVAX_ADDRESS,  abi=WAVAX_ABI)
 router = w3.eth.contract(address=ROUTER_ADDRESS, abi=V2_ROUTER_ABI)
 
 def buy_heresy():
-    amount = w3.to_wei(0.25, "ether")
+    amount   = w3.to_wei(0.25, "ether")
     deadline = w3.eth.get_block("latest")["timestamp"] + 300
 
     # 1) Wrap AVAX → WAVAX
     tx1 = wavax.functions.deposit().build_transaction({
-        "from": acct.address,
+        "from":  acct.address,
         "value": amount,
-        "gas": 100_000,
-        "nonce": w3.eth.get_transaction_count(acct.address)
+        "gas":   100_000,
+        "nonce": w3.eth.get_transaction_count(acct.address, "pending")
     })
     signed1 = acct.sign_transaction(tx1)
     w3.eth.send_raw_transaction(signed1.raw_transaction)
@@ -70,9 +69,9 @@ def buy_heresy():
 
     # 2) Approve router to spend WAVAX
     tx2 = wavax.functions.approve(ROUTER_ADDRESS, amount).build_transaction({
-        "from": acct.address,
-        "gas": 100_000,
-        "nonce": w3.eth.get_transaction_count(acct.address)
+        "from":  acct.address,
+        "gas":   100_000,
+        "nonce": w3.eth.get_transaction_count(acct.address, "pending")
     })
     signed2 = acct.sign_transaction(tx2)
     w3.eth.send_raw_transaction(signed2.raw_transaction)
@@ -81,15 +80,15 @@ def buy_heresy():
 
     # 3) Swap WAVAX → HERESY via V2
     tx3 = router.functions.swapExactTokensForTokens(
-        amount,                   # amountIn = 0.25 WAVAX
-        0,                        # amountOutMin = accept any HERESY
+        amount,
+        0,
         [WAVAX_ADDRESS, HERESY_ADDRESS],
         acct.address,
         deadline
     ).build_transaction({
-        "from": acct.address,
-        "gas": 300_000,
-        "nonce": w3.eth.get_transaction_count(acct.address)
+        "from":  acct.address,
+        "gas":   300_000,
+        "nonce": w3.eth.get_transaction_count(acct.address, "pending")
     })
     signed3  = acct.sign_transaction(tx3)
     tx_hash3 = w3.eth.send_raw_transaction(signed3.raw_transaction)
