@@ -2,58 +2,30 @@ import os
 from web3 import Web3
 from dotenv import load_dotenv
 
-# ── LOAD ENV ──────────────────────────────────────────────────────────────────
 load_dotenv()
-RPC_URL        = os.getenv("AVAX_RPC_URL")
-PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
-HERESY_ADDRESS = Web3.to_checksum_address(
-    os.getenv("HERESY_ADDRESS", "0x432d38F83a50EC77C409D086e97448794cf76dCF")
-)
-SWAP_ROUTER    = Web3.to_checksum_address(
-    os.getenv("PHARAOH_ROUTER", "0x062c62cA66E50Cfe277A95564Fe5bB504db1Fab8")
-)
-WAVAX_ADDRESS  = Web3.to_checksum_address(
-    os.getenv("WAVAX_ADDRESS",   "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7")
-)
 
-# ── WEB3 & ACCOUNT ────────────────────────────────────────────────────────────
+# ── CONFIG ────────────────────────────────────────────────────────────────────
+RPC_URL     = os.getenv("AVAX_RPC_URL")
+PRIVATE_KEY = os.getenv("BOT_PRIVATE_KEY")
+
+# This is your wrapper contract that worked for your manual swaps
+WRAPPER     = Web3.to_checksum_address("0x22C81c051a134c81Ce370D82Fa26975aE9D100B4")
+
+# ── WEB3 SETUP ─────────────────────────────────────────────────────────────────
 w3   = Web3(Web3.HTTPProvider(RPC_URL))
 acct = w3.eth.account.from_key(PRIVATE_KEY)
 
-# ── ABI FOR swapExactAVAXForTokens ─────────────────────────────────────────────
-SWAP_NATIVE_ABI = [{
-    "inputs": [
-      {"name":"amountOutMin","type":"uint256"},
-      {"name":"path","type":"address[]"},
-      {"name":"to","type":"address"},
-      {"name":"deadline","type":"uint256"}
-    ],
-    "name":"swapExactAVAXForTokens",
-    "outputs":[{"name":"amounts","type":"uint256[]"}],
-    "stateMutability":"payable",
-    "type":"function"
-}]
-router = w3.eth.contract(address=SWAP_ROUTER, abi=SWAP_NATIVE_ABI)
-
 def buy_heresy():
-    # 0.25 AVAX
-    amount   = w3.to_wei(0.25, "ether")
-    # give it 5 minutes to execute
-    deadline = w3.eth.get_block("latest")["timestamp"] + 300
-    path     = [WAVAX_ADDRESS, HERESY_ADDRESS]
+    amount = w3.to_wei(0.25, "ether")
+    nonce  = w3.eth.get_transaction_count(acct.address, "pending")
 
-    # build the transaction
-    tx = router.functions.swapExactAVAXForTokens(
-        0,        # accept any amount of $HERESY
-        path,
-        acct.address,
-        deadline
-    ).build_transaction({
+    tx = {
+        "to":    WRAPPER,
         "from":  acct.address,
         "value": amount,
-        "gas":   350_000,
-        "nonce": w3.eth.get_transaction_count(acct.address, "pending")
-    })
+        "gas":   300_000,
+        "nonce": nonce
+    }
 
     signed  = acct.sign_transaction(tx)
     tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
