@@ -4,45 +4,65 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── CONFIG ────────────────────────────────────────────────────────────────────
 RPC_URL        = os.getenv("AVAX_RPC_URL")
 PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
 HERESY_ADDRESS = Web3.to_checksum_address(os.getenv("HERESY_ADDRESS"))
 WAVAX_ADDRESS  = Web3.to_checksum_address(os.getenv("WAVAX_ADDRESS"))
 
-# ← This is the *only* router that implements swapExactAVAXForTokens on Avalanche
-SWAP_ROUTER    = "0x062c62cA66E50Cfe277A95564Fe5bB504db1Fab8"
+# ← Pharaoh V3 SwapRouter (immutable & verified) :contentReference[oaicite:1]{index=1}
+SWAP_ROUTER    = "0xAAAE99091Fbb28D400029052821653C1C752483B"
 
-w3    = Web3(Web3.HTTPProvider(RPC_URL))
-acct  = w3.eth.account.from_key(PRIVATE_KEY)
+# ── WEB3 SETUP ─────────────────────────────────────────────────────────────────
+w3   = Web3(Web3.HTTPProvider(RPC_URL))
+acct = w3.eth.account.from_key(PRIVATE_KEY)
 
-SWAP_NATIVE_ABI = [
+# ── ABI FOR exactInputSingle (Uniswap V3‑style) ───────────────────────────────
+V3_ROUTER_ABI = [
   {
-    "inputs": [
-      {"name":"amountOutMin","type":"uint256"},
-      {"name":"path","type":"address[]"},
-      {"name":"to","type":"address"},
-      {"name":"deadline","type":"uint256"}
+    "inputs":[
+      {
+        "components":[
+          {"internalType":"address","name":"tokenIn","type":"address"},
+          {"internalType":"address","name":"tokenOut","type":"address"},
+          {"internalType":"uint24","name":"fee","type":"uint24"},
+          {"internalType":"address","name":"recipient","type":"address"},
+          {"internalType":"uint256","name":"deadline","type":"uint256"},
+          {"internalType":"uint256","name":"amountIn","type":"uint256"},
+          {"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},
+          {"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}
+        ],
+        "internalType":"struct ISwapRouter.ExactInputSingleParams",
+        "name":"params","type":"tuple"
+      }
     ],
-    "name":"swapExactAVAXForTokens",
-    "outputs":[{"name":"amounts","type":"uint256[]"}],
+    "name":"exactInputSingle",
+    "outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],
     "stateMutability":"payable",
     "type":"function"
   }
 ]
-router = w3.eth.contract(address=SWAP_ROUTER, abi=SWAP_NATIVE_ABI)
+router = w3.eth.contract(address=SWAP_ROUTER, abi=V3_ROUTER_ABI)
 
 def buy_heresy():
-    amount   = w3.to_wei(0.25, "ether")
+    amountIn = w3.to_wei(0.25, "ether")
     deadline = w3.eth.get_block("latest")["timestamp"] + 300
-    tx = router.functions.swapExactAVAXForTokens(
-        0,                      # accept any HERESY
-        [WAVAX_ADDRESS, HERESY_ADDRESS],
-        acct.address,
-        deadline
-    ).build_transaction({
+
+    params = {
+      "tokenIn":         WAVAX_ADDRESS,
+      "tokenOut":        HERESY_ADDRESS,
+      "fee":             3000,            # 0.3% pool
+      "recipient":       acct.address,
+      "deadline":        deadline,
+      "amountIn":        amountIn,
+      "amountOutMinimum":0,               # accept any output
+      "sqrtPriceLimitX96": 0
+    }
+
+    tx = router.functions.exactInputSingle(params).build_transaction({
         "from":      acct.address,
-        "value":     amount,
-        "gas":       350_000,
+        "value":     amountIn,            # send 0.25 AVAX to wrap
+        "gas":       500_000,
         "gasPrice":  w3.eth.gas_price,
         "nonce":     w3.eth.get_transaction_count(acct.address, "pending"),
         "chainId":   43114
