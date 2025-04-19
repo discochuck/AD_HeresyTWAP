@@ -56,7 +56,7 @@ def buy_heresy():
     })
 
     signed  = acct.sign_transaction(tx)
-    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
     print("Swap TX → https://snowtrace.io/tx/" + tx_hash.hex())
 
 if __name__ == "__main__":
