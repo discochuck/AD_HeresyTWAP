@@ -39,7 +39,7 @@ ROUTER_ABI = [
 router = w3.eth.contract(address=ROUTER_ADDRESS, abi=ROUTER_ABI)
 
 def buy_heresy():
-    amount_in = w3.toWei(0.25, "ether")
+    amount_in = w3.to_wei(0.25, "ether")
     path      = [WAVAX_ADDRESS, HERESY_ADDRESS]
     deadline  = w3.eth.get_block("latest")["timestamp"] + 300
 
