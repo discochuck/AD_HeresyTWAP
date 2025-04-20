@@ -1,36 +1,53 @@
 import os
+import requests
 from web3 import Web3
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
-RPC_URL        = os.getenv("AVAX_RPC_URL")
-PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
-# Paste your working manual TX hash here (or set MANUAL_TX_HASH in Heroku config)
-MANUAL_TX_HASH = os.getenv("MANUAL_TX_HASH", "0x7acec5325e7254660abbaa3850e46f05c3f6a06136cd9592f4b3d1ad0b1286a1")
+RPC_URL      = os.getenv("AVAX_RPC_URL")
+PRIVATE_KEY  = os.getenv("BOT_PRIVATE_KEY")
+HERESY       = Web3.to_checksum_address(os.getenv("HERESY_ADDRESS"))
+ZEROX_KEY    = os.getenv("ZEROX_API_KEY")
+CHAIN_ID     = 43114
+AMOUNT       = Web3.to_wei(0.25, "ether")  # 0.25 AVAX
 
-if not MANUAL_TX_HASH.startswith("0x"):
-    raise RuntimeError("Set MANUAL_TX_HASH to your proven Odos swap TX hash")
+if not ZEROX_KEY:
+    raise RuntimeError("Set ZEROX_API_KEY in your Heroku config to your 0x API key.")
 
 # ── WEB3 SETUP ─────────────────────────────────────────────────────────────────
 w3   = Web3(Web3.HTTPProvider(RPC_URL))
 acct = w3.eth.account.from_key(PRIVATE_KEY)
 
-def buy_heresy():
-    # fetch your manual-swap transaction
-    orig = w3.eth.get_transaction(MANUAL_TX_HASH)
+def fetch_0x_quote():
+    url = "https://api.0x.org/swap/v1/quote"
+    params = {
+        "sellToken":          "AVAX",       # native AVAX
+        "buyToken":           HERESY,
+        "sellAmount":         str(AMOUNT),
+        "slippagePercentage": 0.01          # 1% slippage tolerance
+    }
+    headers = {
+        "0x-api-key": ZEROX_KEY,
+        "Accept":     "application/json"
+    }
+    resp = requests.get(url, params=params, headers=headers)
+    resp.raise_for_status()
+    return resp.json()
 
-    # replay exactly the same call
+def buy_heresy():
+    quote = fetch_0x_quote()
+    # Build the tx exactly as 0x returned it
     tx = {
-        "to":        orig["to"],
+        "to":        quote["to"],
         "from":      acct.address,
-        "data":      orig["input"],
-        "value":     orig["value"],
-        "gas":       700_000,
-        "gasPrice":  w3.eth.gas_price,
+        "data":      quote["data"],
+        "value":     int(quote.get("value", 0)),
+        "gas":       int(quote["gas"]),
+        "gasPrice":  int(quote["gasPrice"]),
         "nonce":     w3.eth.get_transaction_count(acct.address, "pending"),
-        "chainId":   43114
+        "chainId":   CHAIN_ID
     }
 
     signed  = acct.sign_transaction(tx)
