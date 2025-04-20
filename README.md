@@ -33,7 +33,7 @@ Automated bot to purchase **0.25 AVAX** worth of **HERESY** tokens daily via T
    AVAX_RPC_URL=https://api.avax.network/ext/bc/C/rpc
    BOT_PRIVATE_KEY=0xYOUR_PRIVATE_KEY
    WAVAX_ADDRESS=0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7
-   HERESY_ADDRESS=0xd57741411cc5d9bf1786523e40412d77946a55aa
+   HERESY_ADDRESS=0x432d38F83a50EC77C409D086e97448794cf76dCF 
    JOE_ROUTER=0x60ae616a2155ee3d9a68541ba4544862310933d4
    ```
 
@@ -48,7 +48,7 @@ Automated bot to purchase **0.25 AVAX** worth of **HERESY** tokens daily via T
    heroku config:set AVAX_RPC_URL="https://api.avax.network/ext/bc/C/rpc" \
                      BOT_PRIVATE_KEY="0xYOUR_PRIVATE_KEY" \
                      WAVAX_ADDRESS="0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7" \
-                     HERESY_ADDRESS="0xd57741411cc5d9bf1786523e40412d77946a55aa" \
+                     HERESY_ADDRESS="0x432d38F83a50EC77C409D086e97448794cf76dCF" \
                      JOE_ROUTER="0x60ae616a2155ee3d9a68541ba4544862310933d4" \
                      --app adheresytwap
    ```
