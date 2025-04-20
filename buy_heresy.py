@@ -1,38 +1,59 @@
 import os
+import requests
 from web3 import Web3
 from dotenv import load_dotenv
-from oneinch_py import OneInchSwap, TransactionHelper
 
 load_dotenv()
 
-RPC_URL     = os.getenv("AVAX_RPC_URL")
-PRIVATE_KEY = os.getenv("BOT_PRIVATE_KEY")
-HERESY      = Web3.to_checksum_address(os.getenv("HERESY_ADDRESS"))
-AVAX        = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"  # 1inch sentinel
+RPC_URL        = os.getenv("AVAX_RPC_URL")
+PRIVATE_KEY    = os.getenv("BOT_PRIVATE_KEY")
+HERESY_ADDRESS = Web3.to_checksum_address(os.getenv("HERESY_ADDRESS"))
 
-# ← Chain ID for Avalanche
-CHAIN_ID    = 43114
+w3   = Web3(Web3.HTTPProvider(RPC_URL))
+acct = w3.eth.account.from_key(PRIVATE_KEY)
 
-# Initialize Web3 & 1inch SDK
-w3    = Web3(Web3.HTTPProvider(RPC_URL))
-swap  = OneInchSwap(chain_id=CHAIN_ID)             # no API key needed for public endpoints
-helper= TransactionHelper(provider_url=RPC_URL)
+def fetch_1inch_swap(amount_wei, slippage=1):
+    url = "https://api.1inch.io/v4.0/43114/swap"
+    params = {
+        "fromTokenAddress": "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+        "toTokenAddress":   HERESY_ADDRESS,
+        "amount":           str(amount_wei),
+        "fromAddress":      acct.address,
+        "slippage":         str(slippage),
+    }
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "python-requests/your-app"
+    }
+    resp = requests.get(url, params=params, headers=headers)
+    # debug
+    print(f"1inch v4 status: {resp.status_code}")
+    try:
+        data = resp.json()
+    except Exception as e:
+        print("Body was:", resp.text[:500])
+        raise
+    if "tx" not in data:
+        raise RuntimeError(f"1inch v4 error: {data}")
+    return data["tx"]
 
 def buy_heresy():
-    amount = w3.to_wei(0.25, "ether")
+    amount_wei = w3.to_wei(0.25, "ether")
+    swap_tx    = fetch_1inch_swap(amount_wei, slippage=1)
 
-    # build the swap via 1inch
-    tx_params = swap.build_swap(
-        from_token_address = AVAX,
-        to_token_address   = HERESY,
-        amount             = amount,
-        from_address       = w3.eth.account.from_key(PRIVATE_KEY).address,
-        slippage            = 1   # 1%
-    )
+    tx = {
+        "to":        swap_tx["to"],
+        "from":      swap_tx["from"],
+        "data":      swap_tx["data"],
+        "value":     int(swap_tx.get("value", 0)),
+        "gas":       int(swap_tx["gas"]),
+        "gasPrice":  int(swap_tx["gasPrice"]),
+        "nonce":     w3.eth.get_transaction_count(acct.address, "pending"),
+        "chainId":   43114
+    }
 
-    # sign & send it in one step
-    signed_tx = helper.sign_transaction(tx_params, PRIVATE_KEY)
-    tx_hash   = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
+    signed  = acct.sign_transaction(tx)
+    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
     print("🔄 Swap TX → https://snowtrace.io/tx/" + tx_hash.hex())
 
 if __name__=="__main__":
